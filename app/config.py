@@ -45,6 +45,7 @@ class Settings:
     bili_tags: str
     bili_copyright: int
     max_file_mb: int
+    data_dir: str
     adb_enabled: bool
     adb_bin: str
     adb_serial: str
@@ -79,7 +80,9 @@ def load_settings() -> Settings:
         bili_tid=_int("BILI_TID", 122),
         bili_tags=os.getenv("BILI_TAGS", "toondown").strip() or "toondown",
         bili_copyright=_int("BILI_COPYRIGHT", 1),
-        max_file_mb=_int("MAX_FILE_MB", 1200),
+        # High default; runtime clamps to actual free disk (2 GB or 18 GB, whatever is there).
+        max_file_mb=_int("MAX_FILE_MB", 16000),
+        data_dir=os.getenv("DATA_DIR", "/tmp/toondown").strip() or "/tmp/toondown",
         adb_enabled=_bool("ADB_ENABLED", False),
         adb_bin=os.getenv("ADB_BIN", "adb").strip() or "adb",
         adb_serial=os.getenv("ADB_SERIAL", "").strip(),

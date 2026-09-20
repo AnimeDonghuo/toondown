@@ -53,7 +53,7 @@ class BiliWebUploader:
         sessdata: str,
         jct: str,
         dedeuserid: str = "",
-        timeout: float = 120.0,
+        timeout: float = 300.0,
     ) -> None:
         if not sessdata or not jct:
             raise BiliError("BILI_SESSDATA and BILI_JCT are required")

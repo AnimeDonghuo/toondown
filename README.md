@@ -1,47 +1,39 @@
 # toondown
 
-Telegram **user client** (MTProto, `api_id` / `api_hash`) that:
+Telegram **user client** (MTProto, `api_id` / `api_hash`). It pulls a video that already lives in Telegram — or a remote URL you paste — and can publish it to mainland `member.bilibili.com`.
 
-1. Pulls videos up to **2 GB** (4 GB with Telegram Premium) — not the Bot API 20 MB cap.
-2. Optionally publishes them to **mainland** `member.bilibili.com` with studio cookies.
-3. Optionally `adb push`es them into an Android emulator/device **Download** folder so you can tap Upload in the international Bilibili app on a PC.
+## Remote video from Telegram
 
-It does **not** reverse-engineer the 2026 international Bilibili app, and it does **not** run that emulator on Koyeb’s free instance.
+The 20 MB Bot API cap does **not** apply. This process is a user account:
 
-## What I will not build
-
-| Ask | Why not |
+| You send | What happens |
 | --- | --- |
-| Unofficial API scraped from the intl APK | Private mobile endpoints, unpublished, ToS, and they move. This repo will not MITM or decompile that app. |
-| Android emulator on Koyeb free | Free Nano is **512 MB RAM, 0.1 vCPU, ~2 GB disk, no KVM**. An emulator wants several GB and hardware virtualization. |
+| Video / file / forward | Downloaded over MTProto (2 GB, or 4 GB Premium) |
+| `https://t.me/channel/123` or `https://t.me/c/…/123` | Same account fetches that message if it can see it |
+| `https://host/file.mp4` or `/dl <url>` | Direct HTTP file, streamed to disk |
+| Caption around the link | Title / tags / description (see below) |
 
-## Telegram 20 MB bypass (this is real)
+`/status` prints **real disk total and free**. Jobs are capped to `min(MAX_FILE_MB, free − 400 MB)`.
 
-BotFather bots use HTTP Bot API: `getFile` max **20 MB**.
+## Koyeb storage
 
-A **user account** uses MTProto with the api_id/api_hash from [my.telegram.org](https://my.telegram.org). Same limits as the official app: **2 GB** free, **4 GB** Premium.
+Current Koyeb docs: the **free instance** is 512 MB RAM, 0.1 vCPU, **2 GB SSD**, no attached volume, sleeps after ~1 hour without HTTP.
 
-That is Telethon in this repo. You log in once on your machine, copy `TELEGRAM_SESSION` to Koyeb, and send (or forward) a video to that account.
+If your dashboard really shows ~18 GB ephemeral (older/paid nano, or a different product), this code does not hard-code 2 GB. It uses `shutil.disk_usage` on `DATA_DIR`. Send `/status` after deploy and believe that number.
 
-Koyeb free **disk** is still ~2 GB for the whole container, so a 1.5 GB file may not fit even though Telegram would allow it. `/status` prints free disk. For long HD videos, run the same process on a PC.
+RAM is still **512 MB** on free. Downloads and Bilibili uploads are chunked so a multi-GB file does not have to fit in memory — only on disk.
 
-Koyeb free also **sleeps after ~1 hour with no HTTP**. MTProto is not HTTP. Ping `https://<app>.koyeb.app/health` every few minutes (UptimeRobot or similar) or the client dies.
+Ping `/health` every few minutes or the instance sleeps and the MTProto client dies.
 
-## International app: emulator on a PC (not Koyeb)
+## What this will not do
 
-Fastest path that exists today:
+- Reverse the 2026 international Bilibili app
+- Run an Android emulator on Koyeb Nano
+- yt-dlp / YouTube / random site ripping (send a **direct file** or a Telegram message)
 
-1. Run this repo **on your computer** (or any box with disk + a GPU/CPU that can virtualize).
-2. Start Android emulator or plug in a phone over USB. Install the pink-globe Bilibili app. `adb devices` must see it.
-3. `ADB_ENABLED=1` in `.env`.
-4. Forward a video to the Telegram account this client is logged in as.
-5. The file lands in `/sdcard/Download/toondown/`. Open Bilibili → Upload. Use Ethernet/Wi‑Fi 6, not phone LTE.
+Intl app on a **PC**: `ADB_ENABLED=1`, file lands in `/sdcard/Download/toondown/`, you tap Upload.
 
-That is not an API. It is “get the file onto the device without using the phone’s radio for the Telegram hop.”
-
-Mainland studio (different product, often needs 实名认证): set `BILI_SESSDATA` / `BILI_JCT`.
-
-Only upload content you have the rights to publish.
+Only publish content you have the rights to.
 
 ## Setup
 
@@ -52,38 +44,32 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-1. Open https://my.telegram.org → API development tools → create an app. Put `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` in `.env`.
-2. Login once (phone code, local only):
+1. [my.telegram.org](https://my.telegram.org) → `TELEGRAM_API_ID` / `TELEGRAM_API_HASH`
+2. `python -m app.login` → paste `TELEGRAM_SESSION`
+3. Optional mainland cookies: `BILI_SESSDATA`, `BILI_JCT`
+4. `python -m app.main`
 
-```bash
-python -m app.login
-```
-
-3. Paste the printed string into `TELEGRAM_SESSION`.
-4. `ALLOWED_USER_IDS` — your Telegram id, or leave empty to only accept the logged-in account (Saved Messages works).
-
-```bash
-python -m app.main
-```
-
-Send `/help` or a video to that account.
-
-### Koyeb free web service
-
-Dockerfile is included. HTTP port **8000**, health `/health`.
-
-Env: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, optional Bilibili cookies, `PORT=8000`.
-
-Do not enable ADB on Koyeb. Do not expect 2 GB files to fit.
-
-### Caption
+Then in a private chat with that account:
 
 ```
-Title
+/status
+/dl https://t.me/yourchannel/15
+```
+
+or forward the video, or paste:
+
+```
+Episode title
 tag1,tag2
-description
-source: https://original   # reprints only
+https://cdn.example.com/mine.mp4
+source: https://original
 ```
+
+### Koyeb
+
+Web service, Dockerfile, port `8000`, health `/health`.
+
+Env: `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, optional Bilibili cookies, `DATA_DIR=/tmp/toondown`, `MAX_FILE_MB=16000`.
 
 ## License
 

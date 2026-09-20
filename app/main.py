@@ -8,6 +8,7 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 from app.config import load_settings
+from app.diskutil import free_bytes, human_bytes, total_bytes
 from app.userbot import Worker
 
 logging.basicConfig(
@@ -18,13 +19,23 @@ log = logging.getLogger("toondown")
 
 
 async def health(_request: web.Request) -> web.Response:
-    return web.json_response({"ok": True, "service": "toondown", "transport": "mtproto"})
+    data_dir = _request.app.get("data_dir", "/tmp/toondown")
+    return web.json_response(
+        {
+            "ok": True,
+            "service": "toondown",
+            "transport": "mtproto",
+            "disk_total": human_bytes(total_bytes(data_dir)),
+            "disk_free": human_bytes(free_bytes(data_dir)),
+        }
+    )
 
 
 async def amain() -> None:
     settings = load_settings()
 
     http = web.Application()
+    http["data_dir"] = settings.data_dir
     http.router.add_get("/health", health)
     http.router.add_get("/", health)
     runner = web.AppRunner(http)

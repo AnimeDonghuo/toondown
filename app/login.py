@@ -1,4 +1,4 @@
-"""One-time local login. Prints a TELEGRAM_SESSION string for Koyeb.
+"""One-time PC login. api_id + api_hash are not enough by themselves.
 
   TELEGRAM_API_ID=... TELEGRAM_API_HASH=... python -m app.login
 """
@@ -27,9 +27,13 @@ async def _run() -> None:
     session = client.session.save()
     print()
     print(f"logged in as {me.username or me.first_name} id={me.id}")
-    print("Put this in TELEGRAM_SESSION (one line, keep secret):")
+    print()
+    print("That login is stored as TELEGRAM_SESSION (paste one line into .env / Koyeb):")
     print()
     print(session)
+    print()
+    print("api_id + api_hash only identify the app. The string above is the user login.")
+    print("Without it (or a toondown.session file), Telegram will not give you 2 GB files.")
     print()
     await client.disconnect()
 

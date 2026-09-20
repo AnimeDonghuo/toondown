@@ -4,11 +4,9 @@ import asyncio
 import logging
 
 from aiohttp import web
-from telethon import TelegramClient
-from telethon.sessions import StringSession
-
 from app.config import load_settings
 from app.diskutil import free_bytes, human_bytes, total_bytes
+from app.tg_client import build_client, start_client
 from app.userbot import Worker
 
 logging.basicConfig(
@@ -44,17 +42,9 @@ async def amain() -> None:
     await site.start()
     log.info("health on %s:%s", settings.host, settings.port)
 
-    client = TelegramClient(
-        StringSession(settings.session),
-        settings.api_id,
-        settings.api_hash,
-        device_model="toondown",
-        system_version="Koyeb",
-        app_version="2.0",
-        sequential_updates=True,
-    )
+    client = build_client(settings)
     worker = Worker(client, settings)
-    await client.start()
+    await start_client(client, settings)
     await worker.start()
     log.info("MTProto client running")
     await client.run_until_disconnected()

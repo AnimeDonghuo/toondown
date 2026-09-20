@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiohttp import web
-from aiogram import Bot
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 
-from app.bot import build_dispatcher
-from app.config import Settings, load_settings
+from app.config import load_settings
+from app.userbot import Worker
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,35 +17,40 @@ logging.basicConfig(
 log = logging.getLogger("toondown")
 
 
-async def on_startup(bot: Bot, settings: Settings) -> None:
-    await bot.set_webhook(settings.webhook_url, drop_pending_updates=True)
-    log.info("webhook set to %s", settings.webhook_url)
-
-
-async def on_shutdown(bot: Bot) -> None:
-    await bot.delete_webhook()
-
-
 async def health(_request: web.Request) -> web.Response:
-    return web.json_response({"ok": True, "service": "toondown"})
+    return web.json_response({"ok": True, "service": "toondown", "transport": "mtproto"})
+
+
+async def amain() -> None:
+    settings = load_settings()
+
+    http = web.Application()
+    http.router.add_get("/health", health)
+    http.router.add_get("/", health)
+    runner = web.AppRunner(http)
+    await runner.setup()
+    site = web.TCPSite(runner, settings.host, settings.port)
+    await site.start()
+    log.info("health on %s:%s", settings.host, settings.port)
+
+    client = TelegramClient(
+        StringSession(settings.session),
+        settings.api_id,
+        settings.api_hash,
+        device_model="toondown",
+        system_version="Koyeb",
+        app_version="2.0",
+        sequential_updates=True,
+    )
+    worker = Worker(client, settings)
+    await client.start()
+    await worker.start()
+    log.info("MTProto client running")
+    await client.run_until_disconnected()
 
 
 def main() -> None:
-    settings = load_settings()
-    bot = Bot(settings.bot_token)
-    dp = build_dispatcher(settings)
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-
-    app = web.Application()
-    app["settings"] = settings
-    app.router.add_get("/health", health)
-    app.router.add_get("/", health)
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(
-        app, path=settings.webhook_path
-    )
-    setup_application(app, dp, bot=bot, settings=settings)
-    web.run_app(app, host=settings.host, port=settings.port)
+    asyncio.run(amain())
 
 
 if __name__ == "__main__":

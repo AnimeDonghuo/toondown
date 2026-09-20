@@ -18,3 +18,5 @@ downloads/
 *.cookie
 cookies.json
 bili.cookie
+*.session
+*.session-journal

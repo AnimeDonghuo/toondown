@@ -25,11 +25,18 @@ def _csv_ints(name: str) -> frozenset[int]:
     return frozenset(out)
 
 
+def _bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
-    bot_token: str
-    webhook_secret: str
-    public_url: str
+    api_id: int
+    api_hash: str
+    session: str
     allowed_user_ids: frozenset[int]
     bili_sessdata: str
     bili_jct: str
@@ -38,6 +45,10 @@ class Settings:
     bili_tags: str
     bili_copyright: int
     max_file_mb: int
+    adb_enabled: bool
+    adb_bin: str
+    adb_serial: str
+    adb_remote_dir: str
     port: int
     host: str
 
@@ -45,30 +56,22 @@ class Settings:
     def bili_ready(self) -> bool:
         return bool(self.bili_sessdata and self.bili_jct)
 
-    @property
-    def webhook_path(self) -> str:
-        return f"/tg/{self.webhook_secret}"
-
-    @property
-    def webhook_url(self) -> str:
-        return f"{self.public_url}{self.webhook_path}"
-
 
 def load_settings() -> Settings:
-    token = os.getenv("BOT_TOKEN", "").strip()
-    secret = os.getenv("WEBHOOK_SECRET", "").strip()
-    public = os.getenv("PUBLIC_URL", "").strip().rstrip("/")
-    if not token:
-        raise SystemExit("BOT_TOKEN is required")
-    if not secret:
-        raise SystemExit("WEBHOOK_SECRET is required")
-    if not public.startswith("https://"):
-        raise SystemExit("PUBLIC_URL must be an https:// origin (Koyeb app URL)")
+    api_id_raw = os.getenv("TELEGRAM_API_ID", "").strip()
+    api_hash = os.getenv("TELEGRAM_API_HASH", "").strip()
+    session = os.getenv("TELEGRAM_SESSION", "").strip()
+    if not api_id_raw or not api_hash:
+        raise SystemExit("TELEGRAM_API_ID and TELEGRAM_API_HASH are required (my.telegram.org)")
+    if not session:
+        raise SystemExit(
+            "TELEGRAM_SESSION is required. Run locally: python -m app.login"
+        )
 
     return Settings(
-        bot_token=token,
-        webhook_secret=secret,
-        public_url=public,
+        api_id=int(api_id_raw),
+        api_hash=api_hash,
+        session=session,
         allowed_user_ids=_csv_ints("ALLOWED_USER_IDS"),
         bili_sessdata=os.getenv("BILI_SESSDATA", "").strip(),
         bili_jct=os.getenv("BILI_JCT", "").strip(),
@@ -76,7 +79,12 @@ def load_settings() -> Settings:
         bili_tid=_int("BILI_TID", 122),
         bili_tags=os.getenv("BILI_TAGS", "toondown").strip() or "toondown",
         bili_copyright=_int("BILI_COPYRIGHT", 1),
-        max_file_mb=_int("MAX_FILE_MB", 19),
+        max_file_mb=_int("MAX_FILE_MB", 1200),
+        adb_enabled=_bool("ADB_ENABLED", False),
+        adb_bin=os.getenv("ADB_BIN", "adb").strip() or "adb",
+        adb_serial=os.getenv("ADB_SERIAL", "").strip(),
+        adb_remote_dir=os.getenv("ADB_REMOTE_DIR", "/sdcard/Download/toondown").strip()
+        or "/sdcard/Download/toondown",
         port=_int("PORT", 8000),
         host=os.getenv("HOST", "0.0.0.0"),
     )
